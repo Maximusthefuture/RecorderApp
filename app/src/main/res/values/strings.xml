@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">RecorderApp</string>
+    <string name="running_record">Running</string>
+    <string name="recording_time">Recording %d</string>
+    <string name="notification_channel_name">Mychannel</string>
+    <string name="description">channeldescription</string>
+    <string name="record">Record</string>
+</resources>
