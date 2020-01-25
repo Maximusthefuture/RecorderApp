@@ -6,7 +6,9 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Build;
@@ -29,9 +31,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class RecordingService extends Service {
+public class RecordingService extends Service{
 
-    public static final String CHANNEL_ID = "MyChannel";
+    private static final String CHANNEL_ID = "MyChannel";
     private static final String TAG = "RecordingService";
     private static final int NOTIFICATION_ID = 1;
     private static final String ACTION_PAUSE = "RECORD_SERVICE_ACTION_PAUSE";
@@ -39,13 +41,11 @@ public class RecordingService extends Service {
     private static final String ACTION_STOP = "RECORD_SERVICE_ACTION_STOP";
     private MediaRecorder mMediaRecorder;
     private MediaPlayer mMediaPlayer;
-    boolean isRecording = false;
+    private boolean isRecording = false;
     private List<Record> mRecordList;
-    int seconds;
+    private String fileName;
+    private OnRecordClickListener mOnRecordClickListener;
 
-    String fileName;
-    String time;
-    OnRecordClickListener mOnRecordClickListener;
 
 
     @Override
@@ -81,6 +81,8 @@ public class RecordingService extends Service {
             stopSelf();
             stopForeground(STOP_FOREGROUND_REMOVE);
             Toast.makeText(this, "Stop", Toast.LENGTH_SHORT).show();
+
+
         }
         startForeground(NOTIFICATION_ID, testNotification());
         return START_NOT_STICKY;
@@ -109,8 +111,6 @@ public class RecordingService extends Service {
         RemoteViews remoteViews = new RemoteViews(getPackageName(), R.layout.custom_notification);
         remoteViews.setOnClickPendingIntent(R.id.stop, stopPedingIntent);
 
-
-
         if (isRecording) {
             remoteViews.setImageViewResource(R.id.play, R.drawable.ic_pause_black_24dp);
             remoteViews.setOnClickPendingIntent(R.id.play, pausePengingIntent);
@@ -121,7 +121,6 @@ public class RecordingService extends Service {
             remoteViews.setOnClickPendingIntent(R.id.play, playPending);
             remoteViews.setImageViewResource(R.id.play, R.drawable.ic_play_arrow_black_24dp);
             remoteViews.setTextViewText(R.id.recorder_state_text_view, "Pause");
-
         }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
@@ -136,24 +135,21 @@ public class RecordingService extends Service {
 
     }
 
-    public List<Record> getRecords() {
-        List<Record> recordList = new ArrayList<>();
-        String name = Environment.getExternalStorageDirectory().toString() + "/Download";
-
-        Log.d(TAG, "getRecords: " + name);
-
-        File file = new File(name);
-
-        File[] files = file.listFiles();
-        for (int i = 0; i < files.length; i++) {
-            Record record = new Record(files[i].getName(), "");
-            recordList.add(record);
-//            Collections.sort(recordList, Collections.reverseOrder());
-
-        }
-
-        return recordList;
-    }
+//    public List<Record> getRecords() {
+//        List<Record> recordList = new ArrayList<>();
+//        String name = Environment.getExternalStorageDirectory().toString() + "/Download";
+////        Log.d(TAG, "getRecords: " + name);
+////        File file = new File("/Download");
+//        File file = new File(name);
+//        File[] files = file.listFiles();
+//        for (int i = 0; i < files.length; i++) {
+//            record = new Record(files[i].getName(), "");
+//            recordList.add(record);
+//
+//        }
+//        Log.d(TAG, "getRecords: " + file);
+//        return recordList;
+//    }
 
 
     private void createNotificationChannel() {
@@ -179,25 +175,22 @@ public class RecordingService extends Service {
     @RequiresApi(api = Build.VERSION_CODES.N)
     public void recordStart() {
 
-
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
         Date currectDate = new Date();
 
-        fileName = getExternalCacheDir().getAbsolutePath();
 
-//        Log.d(TAG, "recordStart: " + fileName);
-        fileName += "/" +  simpleDateFormat.format(currectDate) + " audiotest.3gp";
+        Log.d(TAG, "recordStart: " + fileName);
+        fileName = Environment.getExternalStorageDirectory() + "/Download/";
+        fileName += simpleDateFormat.format(currectDate) + " audiotest.3gp";
 
 
         releaseRecorder();
-
         mMediaRecorder = new MediaRecorder();
         mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
         mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
         mMediaRecorder.setOutputFile(fileName);
         isRecording = true;
-
         try {
             mMediaRecorder.prepare();
 
@@ -207,7 +200,6 @@ public class RecordingService extends Service {
         if (isRecording) {
             mMediaRecorder.start();
         }
-
     }
 
     public void releaseRecorder() {
@@ -221,7 +213,6 @@ public class RecordingService extends Service {
         if (mMediaRecorder != null) {
             mMediaRecorder.stop();
             releaseRecorder();
-
             isRecording = false;
         }
     }
@@ -234,12 +225,4 @@ public class RecordingService extends Service {
         }
     }
 
-    public void playSelected() {
-//        Toast.makeText(getApplicationContext(), "Plaing", Toast.LENGTH_SHORT).show();
-        Log.d(TAG, "playSelected: "+ "playing");
-//        mMediaPlayer  = new MediaPlayer();
-//        mMediaPlayer.selectTrack();
-//        mMediaPlayer.start();
-//        mOnRecordClickListener.onRecordClick();
-    }
 }

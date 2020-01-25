@@ -25,6 +25,7 @@
             </intent-filter>
         </activity>
         <service android:name=".RecordingService"/>
+        <service android:name=".MediaPlayerService"/>
     </application>
 
 </manifest>

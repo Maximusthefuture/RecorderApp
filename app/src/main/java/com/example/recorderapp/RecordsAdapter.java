@@ -1,5 +1,6 @@
 package com.example.recorderapp;
 
+import android.media.MediaMetadataRetriever;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,12 +10,15 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.File;
 import java.util.List;
 
 public class RecordsAdapter extends RecyclerView.Adapter<RecordsAdapter.RecordsViewHolder> {
     private List<Record> mRecordList;
     private OnRecordClickListener mOnRecordClickListener;
     private static final String TAG = "RecordsAdapter";
+    private List<File> mFiles;
+    private Utils mUtils = new Utils();
 
     public RecordsAdapter(OnRecordClickListener onRecordClickListener) {
         mOnRecordClickListener = onRecordClickListener;
@@ -34,17 +38,25 @@ public class RecordsAdapter extends RecyclerView.Adapter<RecordsAdapter.RecordsV
 
     @Override
     public int getItemCount() {
-        if (mRecordList.size() != 0) {
-            return mRecordList.size();
-
-        } else {
-            return 0;
-        }
+        return mFiles == null ? 0 : mFiles.size();
+//        return mRecordList == null ? 0 : mRecordList.size();
+//        if (mRecordList.size() != 0) {
+//            return mRecordList.size();
+//
+//        } else {
+//            return 0;
+//        }
     }
 
     public void setRecordList(List<Record> recordList) {
         mRecordList = recordList;
         notifyDataSetChanged();
+    }
+
+    public void setFiles(List<File> files) {
+        mFiles = files;
+        notifyDataSetChanged();
+
     }
 
     public class RecordsViewHolder extends RecyclerView.ViewHolder{
@@ -60,12 +72,19 @@ public class RecordsAdapter extends RecyclerView.Adapter<RecordsAdapter.RecordsV
         }
 
         public void bind(int position) {
-            Record record = mRecordList.get(position);
-            title.setText(record.getTitle());
-            duration.setText(record.getDuration());
+            File file = mFiles.get(position);
+
+//            Record record = mRecordList.get(position);
+            title.setText(file.getName());
+            duration.setText(String.valueOf(mUtils.getRecordLength(file)) + " s");
+
+
             itemView.setOnClickListener(v -> {
-                mOnRecordClickListener.onRecordClick();
-                Toast.makeText(itemView.getContext(), "" + getAdapterPosition(), Toast.LENGTH_SHORT).show();
+                mOnRecordClickListener.onRecordClick(file);
+                notifyDataSetChanged();
+                notifyItemInserted(getAdapterPosition() - 1);
+
+//                Toast.makeText(itemView.getContext(), "" + mRecordList.get(i), Toast.LENGTH_SHORT).show();
             });
 
         }

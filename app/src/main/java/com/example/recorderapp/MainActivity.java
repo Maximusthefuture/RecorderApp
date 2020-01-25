@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.widget.ImageButton;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -17,7 +16,12 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-public class MainActivity extends AppCompatActivity implements OnRecordClickListener{
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     public static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
@@ -28,15 +32,14 @@ public class MainActivity extends AppCompatActivity implements OnRecordClickList
     RecyclerView recyclerView;
     RecordingService recordingService;
 
-    TextView mTextView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-//        createNotificationChannel();
-//        mTextView =  findViewById(R.id.text_view);
         ActivityCompat.requestPermissions(this, permission, REQUEST_RECORD_AUDIO_PERMISSION);
         ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
+
         findViewById(R.id.button).setOnClickListener(v -> {
             Intent intent = new Intent(getApplicationContext(), RecordingService.class);
             startService(intent);
@@ -44,23 +47,40 @@ public class MainActivity extends AppCompatActivity implements OnRecordClickList
         });
 
         playButton = findViewById(R.id.button_play);
-        playButton.setOnClickListener(v ->
-                Toast.makeText(MainActivity.this, "Play button clicked", Toast.LENGTH_SHORT).show());
+        playButton.setOnClickListener(v -> {
+            Toast.makeText(MainActivity.this, "Play button clicked", Toast.LENGTH_SHORT).show();
+        });
+
         init();
         Log.d(TAG, "recordStart: " + getDir("AudioFolder", MODE_PRIVATE));
 
     }
 
+    public List<File> getFiles(File currectDirectory) {
+        File[] files = currectDirectory.listFiles();
+        if (files == null) {
+            return null;
+        }
+        return new ArrayList<>(Arrays.asList(files));
+    }
+
     public void init() {
+        File directoryFile = new File(Environment.getExternalStorageDirectory() + "/Download");
+
         recyclerView = findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new RecordsAdapter(this);
+        adapter = new RecordsAdapter(mOnRecordClickListener);
         DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(getApplicationContext(), DividerItemDecoration.VERTICAL);
         recyclerView.addItemDecoration(dividerItemDecoration);
         recordingService = new RecordingService();
-        adapter.setRecordList(recordingService.getRecords());
-
+        adapter.setFiles(getFiles(directoryFile));
+//        if (getIntent().getAction().equals("ACTION_STOP")) {
+//            adapter.notifyDataSetChanged();
+//        }
+//        adapter.setRecordList(recordingService.getRecords());
+//        adapter.notifyDataSetChanged();
         recyclerView.setAdapter(adapter);
+        recyclerView.invalidate();
     }
 
     @Override
@@ -76,16 +96,22 @@ public class MainActivity extends AppCompatActivity implements OnRecordClickList
         }
     }
 
-
-
     private boolean isExternalStorageWritable() {
         return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED;
     }
 
+    OnRecordClickListener mOnRecordClickListener = (file -> {
+//        recordingService.playSelected(file);
+        startMediaPlayerService(file);
 
-    @Override
-    public void onRecordClick() {
-        recordingService.playSelected();
-//        Toast.makeText(this, "Clicked", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, ": " + file);
+    });
+
+    public void startMediaPlayerService(File file) {
+        Intent intent = new Intent(this, MediaPlayerService.class);
+        intent.putExtra(MediaPlayerService.FILE, file);
+        startService(intent);
     }
+
+
 }
