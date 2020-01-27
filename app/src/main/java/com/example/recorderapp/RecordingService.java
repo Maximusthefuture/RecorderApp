@@ -6,14 +6,14 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
+import android.os.Binder;
 import android.os.Build;
 import android.os.Environment;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.util.Log;
 import android.widget.RemoteViews;
 import android.widget.Toast;
@@ -23,15 +23,12 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
-public class RecordingService extends Service{
+public class RecordingService extends Service {
 
     private static final String CHANNEL_ID = "MyChannel";
     private static final String TAG = "RecordingService";
@@ -40,26 +37,29 @@ public class RecordingService extends Service{
     private static final String ACTION_PLAY = "RECORD_SERVICE_ACTION_PLAY";
     private static final String ACTION_STOP = "RECORD_SERVICE_ACTION_STOP";
     private MediaRecorder mMediaRecorder;
-    private MediaPlayer mMediaPlayer;
     private boolean isRecording = false;
-    private List<Record> mRecordList;
-    private String fileName;
-    private OnRecordClickListener mOnRecordClickListener;
-
-
+    private String mFileName;
+    private RecordBinder mRecordBinder = new RecordBinder();
+    private OnRecordedCallback mOnRecordedCallback;
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
         checkPermission();
-        mRecordList = new ArrayList<>();
 
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return mRecordBinder;
+    }
+
+
+    public class RecordBinder extends Binder {
+        RecordingService getService() {
+            return RecordingService.this;
+        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -80,25 +80,28 @@ public class RecordingService extends Service{
             recordStop();
             stopSelf();
             stopForeground(STOP_FOREGROUND_REMOVE);
+            mOnRecordedCallback.onRecordFinished();
             Toast.makeText(this, "Stop", Toast.LENGTH_SHORT).show();
-
-
         }
         startForeground(NOTIFICATION_ID, testNotification());
         return START_NOT_STICKY;
     }
 
+    public boolean isRecording() {
+        return isRecording;
+    }
 
 
+    public void setOnRecordCallBack(OnRecordedCallback onRecordCallBack) {
+        mOnRecordedCallback = onRecordCallBack;
+    }
     public void checkPermission() {
         ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
     }
 
     public Notification testNotification() {
 
-
         Intent stopIntent = new Intent(getApplicationContext(), RecordingService.class);
-
         Intent pauseIntent = new Intent(getApplicationContext(), RecordingService.class);
         pauseIntent.setAction(ACTION_PAUSE);
         Intent playIntent = new Intent(getApplicationContext(), RecordingService.class);
@@ -114,13 +117,16 @@ public class RecordingService extends Service{
         if (isRecording) {
             remoteViews.setImageViewResource(R.id.play, R.drawable.ic_pause_black_24dp);
             remoteViews.setOnClickPendingIntent(R.id.play, pausePengingIntent);
-//            remoteViews.setTextViewText(R.id.duration_record_custom_notification, startTimer());
             remoteViews.setTextViewText(R.id.recorder_state_text_view, "Recording");
+            remoteViews.setChronometer(R.id.chromomener, SystemClock.elapsedRealtime() , null, true);
+//            remoteViews.setTextViewText(R.id.duration_record_custom_notification, String.format("%02d", 1));
             isRecording = false;
         } else {
+
             remoteViews.setOnClickPendingIntent(R.id.play, playPending);
             remoteViews.setImageViewResource(R.id.play, R.drawable.ic_play_arrow_black_24dp);
             remoteViews.setTextViewText(R.id.recorder_state_text_view, "Pause");
+
         }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
@@ -135,21 +141,6 @@ public class RecordingService extends Service{
 
     }
 
-//    public List<Record> getRecords() {
-//        List<Record> recordList = new ArrayList<>();
-//        String name = Environment.getExternalStorageDirectory().toString() + "/Download";
-////        Log.d(TAG, "getRecords: " + name);
-////        File file = new File("/Download");
-//        File file = new File(name);
-//        File[] files = file.listFiles();
-//        for (int i = 0; i < files.length; i++) {
-//            record = new Record(files[i].getName(), "");
-//            recordList.add(record);
-//
-//        }
-//        Log.d(TAG, "getRecords: " + file);
-//        return recordList;
-//    }
 
 
     private void createNotificationChannel() {
@@ -174,33 +165,34 @@ public class RecordingService extends Service{
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     public void recordStart() {
-
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        Date currectDate = new Date();
-
-
-        Log.d(TAG, "recordStart: " + fileName);
-        fileName = Environment.getExternalStorageDirectory() + "/Download/";
-        fileName += simpleDateFormat.format(currectDate) + " audiotest.3gp";
-
-
-        releaseRecorder();
-        mMediaRecorder = new MediaRecorder();
-        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-        mMediaRecorder.setOutputFile(fileName);
-        isRecording = true;
         try {
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            Date currectDate = new Date();
+
+
+            Log.d(TAG, "recordStart: " + mFileName);
+            mFileName = Environment.getExternalStorageDirectory() + "/Download/";
+            mFileName += simpleDateFormat.format(currectDate) + " audiotest.3gpp";
+//            String file = ContextCompat.getDataDir(this).getPath() + mFileName;
+
+            releaseRecorder();
+            mMediaRecorder = new MediaRecorder();
+            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+            mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+            mMediaRecorder.setOutputFile(mFileName);
+            isRecording = true;
             mMediaRecorder.prepare();
+            if (isRecording) {
+                mMediaRecorder.start();
+            }
 
         } catch (IOException e) {
             e.printStackTrace();
         }
-        if (isRecording) {
-            mMediaRecorder.start();
-        }
+
     }
+
 
     public void releaseRecorder() {
         if (mMediaRecorder != null) {
@@ -214,6 +206,7 @@ public class RecordingService extends Service{
             mMediaRecorder.stop();
             releaseRecorder();
             isRecording = false;
+
         }
     }
 

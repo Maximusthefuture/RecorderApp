@@ -1,18 +1,23 @@
 package com.example.recorderapp;
 
 import android.Manifest;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Environment;
-import android.util.Log;
+import android.os.IBinder;
+import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -21,39 +26,83 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements OnRecordedCallback {
 
-    private static final String TAG = "MainActivity";
     public static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
+    private static final String TAG = "MainActivity";
+    private RecordsAdapter adapter;
+    private RecyclerView recyclerView;
+    private RecordingService recordingService;
+    private MediaPlayerService mMediaPlayerService;
+    private OnRecordClickListener mOnRecordClickListener = (this::startMediaPlayerService);
     private boolean permissionToRecordAccepted = false;
     private String[] permission = {Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
     private ImageButton playButton;
-    RecordsAdapter adapter;
-    RecyclerView recyclerView;
-    RecordingService recordingService;
+    private boolean mBound = false;
+    private boolean isBound = false;
+    private File directoryFile;
+    private Messenger mMessenger;
+    private ServiceConnection mPlayerServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            mMessenger = new Messenger(service);
+            isBound = true;
+        }
 
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mMessenger = null;
+            isBound = false;
+        }
+    };
+    ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            RecordingService.RecordBinder binder = (RecordingService.RecordBinder) service;
+            recordingService = binder.getService();
+            recordingService.setOnRecordCallBack(MainActivity.this);
+            mBound = true;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mBound = false;
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ActivityCompat.requestPermissions(this, permission, REQUEST_RECORD_AUDIO_PERMISSION);
-        ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
-
+//        ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
+        mMediaPlayerService = new MediaPlayerService();
         findViewById(R.id.button).setOnClickListener(v -> {
             Intent intent = new Intent(getApplicationContext(), RecordingService.class);
+            Toast.makeText(this, getString(R.string.press_to_record), Toast.LENGTH_SHORT).show();
+            bindService(intent, mConnection, BIND_AUTO_CREATE);
             startService(intent);
-
-        });
-
-        playButton = findViewById(R.id.button_play);
-        playButton.setOnClickListener(v -> {
-            Toast.makeText(MainActivity.this, "Play button clicked", Toast.LENGTH_SHORT).show();
         });
 
         init();
-        Log.d(TAG, "recordStart: " + getDir("AudioFolder", MODE_PRIVATE));
+    }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mBound = false;
+        isBound = false;
+        unbindService(mConnection);
+        unbindService(mPlayerServiceConnection);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (!isBound) {
+            Intent intent = new Intent(this, MediaPlayerService.class);
+            bindService(intent, mPlayerServiceConnection, Context.BIND_AUTO_CREATE);
+        }
     }
 
     public List<File> getFiles(File currectDirectory) {
@@ -65,22 +114,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void init() {
-        File directoryFile = new File(Environment.getExternalStorageDirectory() + "/Download");
-
+        directoryFile = new File(Environment.getExternalStorageDirectory() + "/Download");
         recyclerView = findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new RecordsAdapter(mOnRecordClickListener);
-        DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(getApplicationContext(), DividerItemDecoration.VERTICAL);
-        recyclerView.addItemDecoration(dividerItemDecoration);
         recordingService = new RecordingService();
         adapter.setFiles(getFiles(directoryFile));
-//        if (getIntent().getAction().equals("ACTION_STOP")) {
-//            adapter.notifyDataSetChanged();
-//        }
-//        adapter.setRecordList(recordingService.getRecords());
-//        adapter.notifyDataSetChanged();
         recyclerView.setAdapter(adapter);
         recyclerView.invalidate();
+
     }
 
     @Override
@@ -96,22 +138,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private boolean isExternalStorageWritable() {
-        return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED;
-    }
-
-    OnRecordClickListener mOnRecordClickListener = (file -> {
-//        recordingService.playSelected(file);
-        startMediaPlayerService(file);
-
-        Log.d(TAG, ": " + file);
-    });
-
     public void startMediaPlayerService(File file) {
+        Message message = Message.obtain(null, MediaPlayerService.MSG_PLAY);
         Intent intent = new Intent(this, MediaPlayerService.class);
-        intent.putExtra(MediaPlayerService.FILE, file);
+        bindService(intent, mPlayerServiceConnection, Context.BIND_AUTO_CREATE);
+        Bundle bundle = new Bundle();
+        bundle.putSerializable(MediaPlayerService.FILE, file);
+        message.setData(bundle);
+        try {
+            mMessenger.send(message);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
         startService(intent);
     }
 
-
+    @Override
+    public void onRecordFinished() {
+        adapter.setFiles(getFiles(directoryFile));
+        adapter.notifyDataSetChanged();
+    }
 }

@@ -10,10 +10,10 @@
 
     <ImageView
         android:id="@+id/image_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
         android:layout_gravity="center_horizontal"
-        android:src="@mipmap/ic_launcher"/>
+        android:src="@drawable/ic_audiotrack_black_24dp"/>
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -22,19 +22,30 @@
 
         <TextView
             android:id="@+id/recorder_state_text_view"
+            android:textColor="@android:color/holo_blue_dark"
+            android:textAppearance="@style/TextAppearance.AppCompat.Medium"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/running_record" />
 
-        <TextView
-            android:id="@+id/duration_record_custom_notification"
+<!--        <TextView-->
+<!--            android:id="@+id/duration_record_custom_notification"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:textColor="@android:color/holo_blue_dark"-->
+<!--            android:textAppearance="@style/TextAppearance.AppCompat.Medium"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_marginTop="16dp"-->
+<!--            android:text="@string/recording_time" />-->
+
+        <Chronometer
+            android:id="@+id/chromomener"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/recording_time" />
+            android:textColor="@android:color/holo_green_light"/>
 
     </LinearLayout>
 
-    <LinearLayout
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="64dp"
         android:orientation="horizontal"
@@ -45,16 +56,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/ic_play_arrow_black_24dp"
-            android:layout_gravity="center_vertical"/>
+            android:layout_gravity="center_vertical"
+            android:layout_centerVertical="true"/>
 
         <ImageView
             android:id="@+id/stop"
+
+            android:layout_centerVertical="true"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/ic_stop_black_24dp"
             android:layout_gravity="center_vertical"
-            android:layout_marginLeft="20dp"/>
+            android:layout_marginLeft="50dp"
+            />
 
-    </LinearLayout>
+    </RelativeLayout>
 
 </LinearLayout>
